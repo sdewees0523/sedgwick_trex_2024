@@ -1,0 +1,61 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-11-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+kstem_1 <- read.csv(here("data", "raw_data", "hydraulics", "left_computer", "condcalc", "2024-07-29 quag_kstem condcalc.csv"))
+kstem_2 <- read.csv(here("data", "raw_data", "hydraulics", "left_computer", "condcalc", "2024-11-16 quag_stem condcalc.csv"))
+kstem_3 <- read.csv(here("data", "raw_data", "hydraulics", "right_computer", "condcalc", "2024-07-29 quag_kstem condcalc.csv"))
+kstem_4 <- read.csv(here("data", "raw_data", "hydraulics", "right_computer", "condcalc", "2024-11-16 quag_stem condcalc.csv"))
+
+
+kstem <- rbind(kstem_1,
+               kstem_2,
+               kstem_3,
+               kstem_4) %>% 
+  distinct() %>% 
+  filter(t.day > 300) %>% 
+  mutate(species = "quag") %>% 
+  separate(col = numbr, into = c("tree", "branch"), sep = "_") %>% 
+  rename(kstem = Ks.g.s.MPa.mm,
+         type = P.MPa) %>%
+  mutate(type = case_when(type == 0 ~ "kmax",
+                          type == -2 ~ "knative"),
+         kstem = kstem * -1) %>% 
+  select(species, tree, branch, type, kstem, plc) %>% 
+  mutate(tree = as.numeric(tree),
+         branch = as.numeric(branch),
+         treatment = case_when(tree < 90 ~ "burned",
+                               tree >- 90 ~ "unburned")) %>% 
+  filter(plc >= -10)
+
+
+knative <- kstem %>% 
+  filter(type == "knative") %>% 
+  select(!plc)
+
+kmax <- kstem %>% 
+  filter(type == "kmax") %>% 
+  select(!plc)
+
+kstem_plc <- kstem %>% 
+  filter(type == "knative") %>% 
+  select(!kstem)
+  
+write.csv(kstem, here("data", "clean_data", "kstem_clean.csv"), row.names = F)
+write.csv(knative, here("data", "clean_data", "knative_clean.csv"), row.names = F)
+write.csv(kmax, here("data", "clean_data", "kmax_clean.csv"), row.names = F)
+write.csv(kstem_plc, here("data", "clean_data", "kstem_plc_clean.csv"), row.names = F)
+
+
+
+```
