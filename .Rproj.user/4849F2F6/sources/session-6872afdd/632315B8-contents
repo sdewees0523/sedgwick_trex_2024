@@ -1,0 +1,45 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-11-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+kleaf_vpm_1 <- read.csv(here("data", "raw_data", "hydraulics", "left_computer", "condcalc", "2024-07-29 quag_kleaf condcalc.csv"))
+kleaf_vpm_2 <- read.csv(here("data", "raw_data", "hydraulics", "right_computer", "condcalc", "2024-07-29 quag_kleaf condcalc.csv"))
+leaf_area <- read.csv(here("data", "raw_data", "hydraulic_scans", "leaf_area.csv")) %>% 
+  mutate(Slice = case_when(Slice == "73_vpmonly_003.jpg" ~ "73_003.jpg",
+                           Slice == "78_forgotleaf_003.jpg" ~ "78_003.jpg",
+                           T ~ Slice),
+         leaf_area = Total.Area/10000) %>% 
+  mutate(Slice = str_remove(Slice, ".jpg")) %>% 
+  separate(Slice, into = c("tree", "branch"), sep = "_") %>% 
+  select(tree, branch, leaf_area) %>% 
+  group_by(tree, branch) %>% 
+  reframe(leaf_area = sum(leaf_area)) %>% 
+  mutate(tree = as.numeric(tree),
+         branch = as.numeric(branch))
+
+kleaf_vpm <- rbind(kleaf_vpm_1, kleaf_vpm_2) %>% 
+  distinct() %>% 
+  filter(t.day > 300) %>% 
+  mutate(species = "quag", 
+         treatment = "postfire") %>% 
+  separate(col = numbr, into = c("tree", "branch"), sep = "_") %>% 
+  rename(kleaf = k.g.s.MPa) %>% 
+  select(species, treatment, tree, branch, kleaf)%>% 
+  mutate(tree = as.numeric(tree),
+         branch = as.numeric(branch)) %>% 
+  inner_join(leaf_area, by = c("tree", "branch")) %>% 
+  mutate(kleaf = kleaf/leaf_area) %>% 
+  
+
+```
+
