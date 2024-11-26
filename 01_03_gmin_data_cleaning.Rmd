@@ -1,0 +1,135 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-11-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(lubridate)
+library(fuzzyjoin)
+```
+
+Removing weird data values to get r-squared >= 0.92
+
+```{r}
+gmin_raw <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>% 
+  mutate(time = hm(time),
+         date = mdy(date)) %>% 
+  filter(date > mdy("11/01/2024")) %>% 
+  separate(tree_id, into = c("tree", "branch"), sep = "_") %>% 
+  select(!X) %>% 
+  mutate(weight = case_when(tree == "101" & branch == "1" & weight < 1.6 ~ NA,
+                            tree == "103" & branch == "2" & weight > 1.2 ~ NA,
+                            tree == "132" & branch == "1" & weight < 1.08 ~ NA,
+                            tree == "66" & branch == "1" & weight < 1.6 ~ NA,
+                            tree == "66" & branch == "2" & weight < 0.85 ~ NA,
+                            tree == "66" & branch == "2" & weight > 0.98 ~ NA,
+                            tree == "70" & branch == "2" & weight > 1.9 ~ NA,
+                            tree == "73" & branch == "1" & weight > 1.2 ~ NA,
+                            tree == "79" & branch == "2" & weight < 1.5 ~ NA,
+                            tree == "86" & branch == "2" & weight > 2 ~ NA,
+                            tree == "78" & branch == "3" & weight > 1.77 ~ NA,
+                            tree == "77" & branch == "2" & weight > 1.3 ~ NA,
+                            tree == "86" & branch == "1" & weight > 1.5 ~ NA,
+                            T ~ weight),
+         time = as.numeric(time)) %>%
+  drop_na(weight) %>% 
+  group_by(tree, branch, gmin_id) %>% 
+  nest() %>% 
+  mutate(model = map(data, ~lm(weight~time, data = .x)),
+         model_summary = map(model, broom::tidy),
+         r_squared = map_dbl(model, ~summary(.x)$r.squared))
+```
+Visualizing to identify weird data points for above
+
+```{r}
+ggplot(gmin_raw, aes(x = time, y = weight))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  facet_wrap(~tree*branch*gmin_id, scales = "free")
+```
+
+Using cleaned data to calculate gmin
+
+```{r}
+data_logger_1 <- read.csv(here("data", "raw_data", "gmin", "11_18_2024_mm_dd_yyyy", "data_logger_11_18_2024.csv"))
+data_logger_2 <- read.csv(here("data", "raw_data", "gmin", "11_22_2024_mm_dd_yyyy", "data_logger_11_22_2024.csv"))
+leaf_area_1 <- read.csv(here("data", "raw_data", "gmin", "11_18_2024_mm_dd_yyyy", "leaf_areas.csv"))
+leaf_area_2 <- read.csv(here("data", "raw_data", "gmin", "11_22_2024_mm_dd_yyyy", "leaf_areas.csv"))
+
+leaf_area <- rbind(leaf_area_1, leaf_area_2) %>% 
+  mutate(Slice = str_remove(Slice, "gmin_"),
+         Slice = str_remove(Slice, ".jpg"),
+         Slice = case_when(Slice == "unlabelled_30004" ~ "unlabelled",
+                           T ~ Slice)) %>% 
+  separate(Slice, into = c("tree", "branch"), sep = "_") %>% 
+  mutate(leaf_area = Total.Area/10000,
+         tree = as.numeric(tree),
+         branch = as.numeric(branch)) %>% 
+  select(tree, branch, leaf_area)
+
+enviro <- rbind(data_logger_1, data_logger_2) %>% 
+  mutate(time = mdy_hm(time)) %>% 
+  separate(time, into = c("date", "time"), sep = " ") %>% 
+  mutate(date = ymd(date),
+         time = str_remove(time, ".{3}$"),
+         time = hm(time))
+
+gmin <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>% 
+  mutate(time = hm(time),
+         date = mdy(date)) %>% 
+  filter(date > mdy("11/01/2024")) %>% 
+  separate(tree_id, into = c("tree", "branch"), sep = "_") %>% 
+  select(!X) %>% 
+  mutate(weight = case_when(tree == "101" & branch == "1" & weight < 1.6 ~ NA,
+                            tree == "103" & branch == "2" & weight > 1.2 ~ NA,
+                            tree == "132" & branch == "1" & weight < 1.08 ~ NA,
+                            tree == "66" & branch == "1" & weight < 1.6 ~ NA,
+                            tree == "66" & branch == "2" & weight < 0.85 ~ NA,
+                            tree == "66" & branch == "2" & weight > 0.98 ~ NA,
+                            tree == "70" & branch == "2" & weight > 1.9 ~ NA,
+                            tree == "73" & branch == "1" & weight > 1.2 ~ NA,
+                            tree == "79" & branch == "2" & weight < 1.5 ~ NA,
+                            tree == "86" & branch == "2" & weight > 2 ~ NA,
+                            tree == "78" & branch == "3" & weight > 1.77 ~ NA,
+                            tree == "77" & branch == "2" & weight > 1.3 ~ NA,
+                            tree == "86" & branch == "1" & weight > 1.5 ~ NA,
+                            T ~ weight),
+         tree = as.numeric(tree),
+         branch = as.numeric(branch)) %>%
+  drop_na(weight) %>% 
+  group_by(tree, branch, gmin_id) %>% 
+  mutate(start_time = lag(time),
+         weight_change = lag(weight) - weight) %>% 
+  drop_na(weight_change) %>% 
+  ungroup() %>% 
+  fuzzy_right_join(x = enviro, y = ., by = c("date" = "date",
+                                             "time" = "start_time",
+                                             "time" = "time"),
+                  match_fun = list(`==`, `>=`, `<=`)) %>% 
+  group_by(tree, branch, gmin_id, date.x, start_time) %>% 
+  reframe(time = time.y,
+          mass_change = mean(weight_change),
+          temperature = mean(temp),
+          rh = mean(rh),
+          pressure = mean(pressure)) %>% 
+  distinct() %>% 
+  inner_join(leaf_area, by = c("tree", "branch")) %>% 
+  mutate(time_change = as.numeric(time - start_time),
+         vpsat_kpa = 0.61121*exp((18.678-(temperature/234.5))*(temperature/(257.14+temperature))),
+         mfvpd = (1-(rh/100))*(vpsat_kpa/pressure),
+         gmin = ((mass_change)/18*1000)/(time_change)/mfvpd/(leaf_area*2)) %>% 
+  group_by(tree, branch, gmin_id, date.x) %>% 
+  reframe(gmin = mean(gmin)) %>%
+         mutate(treatment = case_when(tree < 90 ~ "burned",
+                               tree >= 90 ~ "unburned"),
+         species = "quag") %>% 
+  drop_na()
+
+write.csv(gmin, here("data", "clean_data", "gmin_clean.csv"), row.names = F)
+```
+
+

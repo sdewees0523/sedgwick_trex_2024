@@ -1,8 +1,0 @@
-"0","leaf_area <- read.csv(here(""data"", ""raw_data"", ""hydraulic_scans"", ""leaf_area.csv"")) %>% 
-  mutate(Slice = case_when(Slice == ""73_vpmonly_003.jpg"" ~ ""73_003.jpg"",
-                           Slice == ""78_forgotleaf_003.jpg"" ~ ""78_003.jpg"",
-                           T ~ Slice)) %>% 
-  str_remove(Slice, "".jpg"")
-"
-"2","Error in str_remove(., Slice, "".jpg"") : unused argument ("".jpg"")
-"
