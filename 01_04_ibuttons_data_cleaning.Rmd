@@ -1,0 +1,33 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-11-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+ibutton_files <- list.files(path = here("data", "raw_data", "ibuttons"),
+                         pattern = ".csv$",
+                         recursive = TRUE, 
+                         full.names = TRUE)
+
+ibutton_read_in <- read_csv(ibutton_files, id = "tree", skip= 14)
+
+ibuttons <- ibutton_read_in %>% 
+  mutate(tree = str_remove(tree, "C:/Users/tenni/OneDrive/Desktop/sedgwick_trex_2024/data/raw_data/ibuttons/tree_"),
+         tree = str_remove(tree, ".csv")) %>% 
+  separate(tree, into = c("tree", "branch"), sep = "_") %>% 
+  mutate(date_time = mdy_hms(`Date/Time`)) %>% 
+  rename(temperature_c = Value) %>% 
+  select(tree, branch, date_time, temperature_c)
+
+write.csv(ibuttons, here("data", "clean_data", "temperature_clean.csv"))
+
+```
+
