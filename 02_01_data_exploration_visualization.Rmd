@@ -31,50 +31,50 @@ kleaf_efm <- read.csv(here("data", "clean_data", "kleaf_efm_clean.csv")) %>%
   inner_join(max_temperature, by = c("tree", "branch")) %>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0),
-         postfire_time = case_when(branch < 3 ~ "day one",
-                                   branch >= 3 ~ "week later")) %>% 
-  filter(treatment == "burned")
+         postfire_time = case_when(treatment == "unburned" ~ "unburned",
+                                   branch < 3 ~ "day one",
+                                   branch >= 3 ~ "week later"))
 
 kleaf_vpm <- read.csv(here("data", "clean_data", "kleaf_vpm_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0),
-         postfire_time = case_when(branch < 3 ~ "day one",
-                                   branch >= 3 ~ "week later"))%>% 
-  filter(treatment == "burned")
+         postfire_time = case_when(treatment == "unburned" ~ "unburned",
+                                   branch < 3 ~ "day one",
+                                   branch >= 3 ~ "week later"))
 
 knative <- read.csv(here("data", "clean_data", "knative_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0),
-         postfire_time = case_when(branch < 3 ~ "day one",
-                                   branch >= 3 ~ "week later"))%>% 
-  filter(treatment == "burned")
+         postfire_time = case_when(treatment == "unburned" ~ "unburned",
+                                   branch < 3 ~ "day one",
+                                   branch >= 3 ~ "week later"))
 
 kmax <- read.csv(here("data", "clean_data", "kmax_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch")) %>% 
   filter(kstem < 15)%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0),
-         postfire_time = case_when(branch < 3 ~ "day one",
-                                   branch >= 3 ~ "week later"))%>% 
-  filter(treatment == "burned")
+         postfire_time = case_when(treatment == "unburned" ~ "unburned",
+                                   branch < 3 ~ "day one",
+                                   branch >= 3 ~ "week later"))
 
 plc <- read.csv(here("data", "clean_data", "kstem_plc_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0),
-         postfire_time = case_when(branch < 3 ~ "day one",
-                                   branch >= 3 ~ "week later"))%>% 
-  filter(treatment == "burned")
+         postfire_time = case_when(treatment == "unburned" ~ "unburned",
+                                   branch < 3 ~ "day one",
+                                   branch >= 3 ~ "week later"))
 
 gmin <- read.csv(here("data", "clean_data", "gmin_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0),
-         postfire_time = case_when(branch < 3 ~ "day one",
-                                   branch >= 3 ~ "week later"))%>% 
-  filter(treatment == "burned")
+         postfire_time = case_when(treatment == "unburned" ~ "unburned",
+                                   branch < 3 ~ "day one",
+                                   branch >= 3 ~ "week later"))
 ```
 
 ```{r}
