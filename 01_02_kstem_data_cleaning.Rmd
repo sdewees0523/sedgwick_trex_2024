@@ -16,17 +16,34 @@ kstem_1 <- read.csv(here("data", "raw_data", "hydraulics", "left_computer", "con
 kstem_2 <- read.csv(here("data", "raw_data", "hydraulics", "left_computer", "condcalc", "2024-11-16 quag_stem condcalc.csv"))
 kstem_3 <- read.csv(here("data", "raw_data", "hydraulics", "right_computer", "condcalc", "2024-07-29 quag_kstem condcalc.csv"))
 kstem_4 <- read.csv(here("data", "raw_data", "hydraulics", "right_computer", "condcalc", "2024-11-16 quag_stem condcalc.csv"))
+kstem_5 <- read.csv(here("data", "raw_data", "hydraulics", "right_computer", "2024-07-29 quag_kstem condcalc.csv"))
+kstem_6 <- read.csv(here("data", "raw_data", "hydraulics", "left_computer", "2024-12-03 quag_stem condcalc.csv"))
+
+leaf_area <- read.csv(here("data", "raw_data", "hydraulic_scans", "leaf_area.csv")) %>% 
+  mutate(Slice = case_when(Slice == "73_vpmonly_003.jpg" ~ "73_003.jpg",
+                           Slice == "78_forgotleaf_003.jpg" ~ "78_003.jpg",
+                           T ~ Slice),
+         leaf_area = Total.Area/10000) %>% 
+  mutate(Slice = str_remove(Slice, ".jpg")) %>% 
+  separate(Slice, into = c("tree", "branch"), sep = "_") %>% 
+  select(tree, branch, leaf_area) %>% 
+  group_by(tree, branch) %>% 
+  reframe(leaf_area = sum(leaf_area)) %>% 
+  mutate(tree = as.numeric(tree),
+         branch = as.numeric(branch))
 
 
 kstem <- rbind(kstem_1,
                kstem_2,
                kstem_3,
-               kstem_4) %>% 
+               kstem_4,
+               kstem_5,
+               kstem_6) %>% 
   distinct() %>% 
   filter(t.day > 300) %>% 
   mutate(species = "quag") %>% 
   separate(col = numbr, into = c("tree", "branch"), sep = "_") %>% 
-  rename(kstem = Ks.g.s.MPa.mm,
+  rename(kstem = k.g.s.MPa,
          type = P.MPa) %>%
   mutate(type = case_when(type == 0 ~ "kmax",
                           type == -2 ~ "knative"),
@@ -36,20 +53,25 @@ kstem <- rbind(kstem_1,
          branch = as.numeric(branch),
          treatment = case_when(tree < 90 ~ "burned",
                                tree >- 90 ~ "unburned")) %>% 
-  filter(plc >= -10)
+  inner_join(leaf_area, by = c("tree", "branch")) %>% 
+  mutate(kstem_leafarea = kstem/leaf_area)
 
 
 knative <- kstem %>% 
   filter(type == "knative") %>% 
   select(!plc)
 
-kmax <- kstem %>% 
-  filter(type == "kmax") %>% 
-  select(!plc)
-
 kstem_plc <- kstem %>% 
   filter(type == "knative") %>% 
+  filter(plc >= -10) %>% 
   select(!kstem)
+
+kmax <- kstem %>%
+  filter(type == "kmax") %>% 
+  right_join(kstem_plc, by = c("species", "tree", "branch", "treatment")) %>% 
+  select(species, tree, branch, treatment, type.x, kstem, kstem_leafarea.x) %>% 
+  rename(type = type.x,
+         kstem_leafarea = kstem_leafarea.x)
   
 write.csv(kstem, here("data", "clean_data", "kstem_clean.csv"), row.names = F)
 write.csv(knative, here("data", "clean_data", "knative_clean.csv"), row.names = F)

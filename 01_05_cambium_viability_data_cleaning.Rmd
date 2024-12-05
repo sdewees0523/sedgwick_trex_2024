@@ -1,0 +1,53 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-12-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+```
+
+```{r}
+dry_masses <- read.csv(here("data", "raw_data", "cambium_necrosis_dry_mass.csv"))
+cambium <- read.csv(here("data", "raw_data", "cambium_necrosis.csv")) %>% 
+  left_join(dry_masses, by = c("tree", "branch", "measurement")) %>% 
+  select(tree, branch, measurement, absorbance, dry_mass, date) %>% 
+  rename(measurement = measurement)
+
+
+standard <- cambium %>% 
+  filter(measurement == "standard") %>% 
+  mutate(tree = case_when(tree == "blank" ~ "0",
+                          T~tree),
+         tree = as.numeric(tree),
+         absorbance = as.numeric(absorbance)) %>%
+  filter(date != "11/20/2024")
+
+standard_model <- lm(tree ~ absorbance, data = standard)
+
+summary(standard_model)
+
+cambium_new <- cambium %>% 
+  filter(measurement != "standard") %>% 
+  mutate(concentration = predict(standard_model, newdata = . ),
+         dry_mass = as.numeric(dry_mass)*1000) %>% 
+  mutate(cell_viability = concentration/dry_mass) %>% 
+  select(tree, branch, measurement, cell_viability)
+
+cambium_gmin <- cambium_new %>% 
+  filter(measurement == "gmin") %>% 
+  select(tree, branch, cell_viability)
+
+cambium_hydraulics <- cambium_new %>% 
+  filter(measurement == "kstem") %>% 
+  select(tree, branch, cell_viability)
+
+write.csv(cambium_gmin, here("data", "clean_data", "cambium_gmin_clean.csv"), row.names = F)
+write.csv(cambium_hydraulics, here("data", "clean_data", "cambium_hydraulics_clean.csv"), row.names = F)
+
+
+```
+
