@@ -37,6 +37,21 @@ cambium_new <- cambium %>%
   mutate(cell_viability = concentration/dry_mass) %>% 
   select(tree, branch, measurement, cell_viability)
 
+standard_dec <- cambium %>% 
+  filter(measurement == "standard" & date == "12/3/2024") %>% 
+  mutate(tree = as.numeric(tree)) %>% 
+  filter(tree != 0)
+
+standard_dec_model <- lm(tree ~ absorbance, data = standard_dec)
+summary(standard_dec_model)
+cambium_new_dec <- cambium %>% filter(measurement != "standard" & date == "12/3/2024") %>% 
+  mutate(concentration = predict(standard_dec_model, newdata = . ),
+         dry_mass = as.numeric(dry_mass)*1000) %>% 
+  mutate(cell_viability = concentration/dry_mass) %>% 
+  select(tree, branch, measurement, cell_viability)
+
+cambium_new <- rbind(cambium_new, cambium_new_dec)
+
 cambium_gmin <- cambium_new %>% 
   filter(measurement == "gmin") %>% 
   select(tree, branch, cell_viability)

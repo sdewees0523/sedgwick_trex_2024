@@ -27,7 +27,12 @@ ibuttons <- ibutton_read_in %>%
   rename(temperature_c = Value) %>% 
   select(tree, branch, date_time, temperature_c)
 
-write.csv(ibuttons, here("data", "clean_data", "temperature_clean.csv"))
+write.csv(ibuttons, here("data", "clean_data", "temperature_clean.csv"), row.names = F)
 
+max_temperatures <- ibuttons %>% 
+  group_by(tree, branch) %>% 
+  reframe(temperature = max(temperature_c))
+
+write.csv(max_temperatures, here("data", "clean_data", "max_temperatures.csv"), row.names = F)
 ```
 

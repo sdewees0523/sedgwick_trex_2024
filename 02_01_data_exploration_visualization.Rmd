@@ -11,6 +11,8 @@ library(tidyverse)
 library(lubridate)
 library(lme4)
 library(lmerTest)
+library(MuMIn)
+library(emmeans)
 ```
 
 ```{r}
@@ -28,7 +30,7 @@ max_temperature <- temperatures %>%
 
 
 time_hot <- temperatures %>%
-  filter(temperature_c >= 40) %>%
+  filter(temperature_c >= 25) %>%
   group_by(tree, branch) %>%
   reframe(minutes = n())%>%
   mutate(branch = as.numeric(branch))
@@ -46,7 +48,7 @@ kleaf_efm <- read.csv(here("data", "clean_data", "kleaf_efm_clean.csv")) %>%
 kleaf_vpm <- read.csv(here("data", "clean_data", "kleaf_vpm_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
-  inner_join(cambium_hydraulics, by = c("tree", "branch")) %>% 
+  #inner_join(cambium_hydraulics, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0)) %>% 
     mutate(postfire_time = case_when(treatment == "unburned" ~ "unburned",
                                    branch < 3 ~ "day one",
@@ -55,7 +57,7 @@ kleaf_vpm <- read.csv(here("data", "clean_data", "kleaf_vpm_clean.csv")) %>%
 knative <- read.csv(here("data", "clean_data", "knative_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
-  inner_join(cambium_hydraulics, by = c("tree", "branch")) %>%
+  #inner_join(cambium_hydraulics, by = c("tree", "branch")) %>%
   mutate(minutes = replace_na(minutes, 0)) %>% 
   mutate(postfire_time = case_when(treatment == "unburned" ~ "unburned",
                                    branch < 3 ~ "day one",
@@ -65,7 +67,7 @@ kmax <- read.csv(here("data", "clean_data", "kmax_clean.csv")) %>%
   inner_join(max_temperature, by = c("tree", "branch")) %>% 
   filter(kstem < 15)%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
-  inner_join(cambium_hydraulics, by = c("tree", "branch")) %>%
+  #inner_join(cambium_hydraulics, by = c("tree", "branch")) %>%
   mutate(minutes = replace_na(minutes, 0)) %>% 
   mutate(postfire_time = case_when(treatment == "unburned" ~ "unburned",
                                    branch < 3 ~ "day one",
@@ -74,7 +76,7 @@ kmax <- read.csv(here("data", "clean_data", "kmax_clean.csv")) %>%
 plc <- read.csv(here("data", "clean_data", "kstem_plc_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
-  inner_join(cambium_hydraulics, by = c("tree", "branch")) %>%
+  #inner_join(cambium_hydraulics, by = c("tree", "branch")) %>%
   mutate(minutes = replace_na(minutes, 0)) %>% 
   mutate(postfire_time = case_when(treatment == "unburned" ~ "unburned",
                                    branch < 3 ~ "day one",
@@ -83,7 +85,7 @@ plc <- read.csv(here("data", "clean_data", "kstem_plc_clean.csv")) %>%
 gmin <- read.csv(here("data", "clean_data", "gmin_clean.csv")) %>% 
   left_join(max_temperature, by = c("tree", "branch"))%>% 
   left_join(time_hot, by = c("tree", "branch")) %>% 
-  inner_join(cambium_gmin, by = c("tree", "branch")) %>% 
+  #inner_join(cambium_gmin, by = c("tree", "branch")) %>% 
   mutate(minutes = replace_na(minutes, 0),
          postfire_time = case_when(treatment == "unburned" ~ "unburned",
                                    treatment == "preburn" ~ "preburn",
@@ -101,97 +103,240 @@ hydraulics_efm <- inner_join(kleaf_efm, knative, by = c("tree", "branch")) %>%
   mutate(difference = kstem_leafarea - kleaf,
          kleaf_real = 1/(1/kleaf - 1/kstem_leafarea)) %>% 
   inner_join(plc, by = c("tree", "branch"))
+
+vpm_gmin <- inner_join(kleaf_vpm, gmin, by = c("tree", "branch"))
+efm_gmin <- inner_join(kleaf_efm, gmin, by = c("tree", "branch"))
+kleaf <- inner_join(hydraulics_efm, gmin, by = c("tree", "branch"))
 ```
+
+
+
+### Story I want to tell: 
+
+
 ```{r}
 cambium_temperature <- rbind(cambium_gmin, cambium_hydraulics) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))
 
-ggplot(cambium_temperature, aes(x = temperature, y = cell_viability))+
+ggplot(cambium_temperature %>% filter(cell_viability <2), aes(x = temperature, y = cell_viability))+
   geom_point()+
   geom_smooth(method = "glm",
               method.args = list(c("Gamma")))+
+  annotate("text", x = 25, y = 2.25, label = "r2 = 0.27")+
+  annotate("text", x = 25, y = 2.1, label = "p = 0.036")+
   theme_classic()
 
-summary(lmer(cell_viability~temperature + (1|tree) + (1|branch), data = cambium_temperature))
+summary(lmer(cell_viability~temperature + (1|tree) + (1|branch), data = cambium_temperature %>% filter(cell_viability <2)))
+r.squaredGLMM(lmer(cell_viability~temperature + (1|tree) + (1|branch), data = cambium_temperature %>% filter(cell_viability <2)))
 ```
 
-  
+
+```{r}
+summary(lmer(kleaf~temperature + (1|tree), data = kleaf_efm))
+ggplot(kleaf_efm, aes(x = temperature, y = kleaf))+
+  geom_point(aes(color = postfire_time))+
+  geom_smooth(method = "glm")+
+  annotate("text", x = 22, y = 0.22, label = "r2 = 0.10")+
+  annotate("text", x = 22, y = 0.21, label = "p = 0.041")+
+  # geom_hline(yintercept = 0.13)+
+  # geom_hline(yintercept = 0.085, linetype = "dashed")+
+  # geom_hline(yintercept= 0.17, linetype = "dashed")+
+  theme_classic()
+```
+
+```{r}
+kleaf_vpm_model <- lmer(kbranch~postfire_time + (1|tree), data = kleaf_vpm)
+kleaf_vpm_emm <- emmeans(kleaf_vpm_model, ~postfire_time)
+kleaf_vpm_pairwise <- contrast(kleaf_vpm_emm, method = "pairwise")
+
+kleaf_vpm_letters <- tibble(postfire_time = c("unburned", "day one", "week later"),
+                            letters = c("a", "b", "a"))
+
+kleaf_vpm$postfire_time <- factor(kleaf_vpm$postfire_time, levels = c("unburned", "day one", "week later"))
+
+ggplot(kleaf_vpm, aes(x = postfire_time, y = kbranch))+
+  geom_boxplot()+
+  geom_text(data = kleaf_vpm_letters, aes(x = postfire_time, y = 16, label = letters))+
+  labs(title = "kbranch VPM")+
+  theme_classic()
+```
+
+```{r}
+ggplot(kleaf_vpm, aes(x = temperature, y = kbranch))+
+  geom_point(aes(color = postfire_time))+
+  geom_smooth(method = "glm")+
+  geom_text(aes(x = 20, y = 17, label = "p = 0.2755"))+
+  theme_classic()
+```
+
+```{r}
+ggplot(gmin, aes(x = temperature, y = gmin))+
+  geom_point(aes(color = postfire_time))+
+  geom_smooth(method = "glm") +
+  annotate("text", x = 20, y = 12, label = "r2 = 0.18")+
+  annotate("text", x = 20, y = 11.25, label = "p < 0.01")+
+  theme_classic()
+```
+
+```{r}
+ggplot(vpm_gmin, aes(x = gmin, y = kbranch))+
+  geom_point()+
+  geom_smooth(method = "glm")+
+  annotate("text", x = 1, y = 27, label = "r2 = 0.20")+
+  annotate("text", x = 1, y = 25.5, label = "p < 0.01")+
+  theme_classic()
+```
+
+```{r}
+ggplot(efm_gmin, aes(x = gmin, y = kleaf))+
+  geom_point()+
+  geom_smooth(method = "glm")+
+  annotate("text", x = 2, y = 0.17, label = "r2 = 0.09")+
+  annotate("text", x = 2, y = 0.16, label = "p = 0.67")+
+  theme_classic()
+```
+
+```{r}
+kstem_model <- lmer(kstem_leafarea~postfire_time + (1|tree), data = knative)
+kstem_emm <- emmeans(kstem_model, ~postfire_time)
+kstem_pairwise <- contrast(kstem_emm, method = "pairwise")
+
+knative_letters <- tibble(postfire_time = c("unburned", "day one", "week later"),
+                          letters = c("a", "a", "b"))
+
+knative$postfire_time <- factor(knative$postfire_time, levels = c("unburned", "day one", "week later"))
+
+ggplot(knative, aes(x = postfire_time, y = kstem_leafarea))+
+  geom_boxplot()+
+  geom_text(data = knative_letters, aes(x = postfire_time, y = 50, label = letters))+
+  labs(title = "kstem per leaf area native")+
+  theme_classic()
+```
+
+```{r}
+TukeyHSD(aov(kstem ~ postfire_time, data = kmax))
+
+kmax_letters <- tibble(postfire_time = c("unburned", "day one", "week later"),
+                          letters = c("ab", "a", "b"))
+
+kmax$postfire_time <- factor(kmax$postfire_time, levels = c("unburned", "day one", "week later"))
+
+ggplot(kmax, aes(x = postfire_time, y = kstem))+
+  geom_boxplot()+
+  labs(title = "kstem max")+
+  geom_text(data = kmax_letters, aes(x= postfire_time, y = 0.07, label = letters))+
+  theme_classic()
+```
+
+```{r}
+summary(lm(kstem ~ cell_viability, data = kmax))
+
+ggplot(kmax, aes(x = cell_viability, y = kstem))+
+  geom_point(aes(color = postfire_time))+
+  geom_smooth(method = "glm")+
+  annotate("text", x = 0.2, y = 0.0575,label =  "r2 = 0.14")+
+  annotate("text", x = 0.2, y = 0.0545,label =  "p = 0.026")+
+  theme_classic()
+
+```
+
+## Remnant graphs, keeping for now  
+
+
 ```{r}
 ggplot(kleaf_efm, aes(x = postfire_time, y = kleaf))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kbranch EFM")
 
 TukeyHSD(aov(kleaf~postfire_time, data = kleaf_efm))
 
 ggplot(kleaf_vpm, aes(x = postfire_time, y = kbranch))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kbranch VPM")
 
 TukeyHSD(aov(kbranch~postfire_time, data = kleaf_vpm))
 summary(lmer(kbranch~postfire_time + (1|tree), data = kleaf_vpm))
 
 ggplot(hydraulics_all, aes(x = postfire_time.y, y = kleaf_real))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kleaf VPM")
 
-TukeyHSD(aov(kleaf_real~postfire_time, data = hydraulics_all))
+TukeyHSD(aov(kleaf_real~postfire_time.y, data = hydraulics_all))
 
 ggplot(knative, aes(x = postfire_time, y = kstem))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kstem native")
 
 TukeyHSD(aov(kstem~postfire_time, data = knative))
 
 ggplot(knative, aes(x = postfire_time, y = kstem_leafarea))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kstem per leaf area native")
 
 TukeyHSD(aov(kstem_leafarea~postfire_time, data = knative))
 
 ggplot(kmax, aes(x = postfire_time, y = kstem))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kstem max")
 
-TukeyHSD(aov(kst))
 ggplot(kmax, aes(x = postfire_time, y = kstem_leafarea))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kstem per leaf area max")
 
 ggplot(plc, aes(x = postfire_time, y = plc))+
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "kstem PLC")
+
 ```
 
 
 ```{r}
-ggplot(kleaf_efm %>% filter(postfire_time != "unburned"), aes(x = temperature, y = kleaf))+
+summary(lmer(kleaf~temperature + (1|tree), data = kleaf_efm))
+
+ggplot(kleaf_efm, aes(x = temperature, y = kleaf))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm")+
   theme_classic()
 
+ggplot(kleaf_vpm, aes(x = temperature, y = kbranch))+
+  geom_point(aes(color = postfire_time))+
+  geom_hline(yintercept = 2.47)+
+  geom_hline(yintercept = 1.72, linetype = "dashed")+
+  geom_hline(yintercept = 3.22, linetype = "dashed")+
+  geom_smooth(method = "glm")+
+  theme_classic()
 
-ggplot(hydraulics_all%>% filter(postfire_time.y != "unburned" & kleaf_real >= 0), aes(x = temperature.x, y = kleaf_real))+
+
+ggplot(hydraulics_all, aes(x = temperature.x, y = kleaf_real))+
   geom_point(aes(color = postfire_time.y))+
   geom_smooth(method = "glm")+
   theme_classic()
 
-ggplot(knative %>% filter(postfire_time != "unburned"), aes(x = temperature, y = kstem_leafarea))+
+ggplot(knative, aes(x = temperature, y = kstem_leafarea))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm",
               method.args = list(c("Gamma")))+
   theme_classic()
 
-ggplot(kmax %>% filter(postfire_time != "unburned"), aes(x = temperature, y = kstem))+
+ggplot(kmax, aes(x = temperature, y = kstem))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm",
               method.args = list(c("Gamma")))+
   theme_classic()
 
-ggplot(plc %>% filter(postfire_time != "unburned"), aes(x = temperature, y = plc))+
+ggplot(plc, aes(x = temperature, y = plc))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm")+
   theme_classic()
 ```
 
 ```{r}
-ggplot(kleaf_efm, aes(x = cell_viability, y = kleaf))+
+ggplot(kleaf_efm %>% filter(postfire_time != "unburned"), aes(x = cell_viability, y = kleaf))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm")+
   theme_classic()
 
-ggplot(kleaf_vpm, aes(x = cell_viability, y = kbranch))+
+ggplot(kleaf_vpm %>% filter(postfire_time != "unburned"), aes(x = cell_viability, y = kbranch))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm")+
   theme_classic()
@@ -202,15 +347,35 @@ ggplot(hydraulics_all%>% filter(kleaf_real >= 0), aes(x = cell_viability, y = kl
    geom_smooth(method = "glm")+
    theme_classic()
 
-ggplot(knative, aes(x = cell_viability, y = kstem_leafarea))+
+ggplot(knative %>% filter(postfire_time != "unburned"), aes(x = cell_viability, y = kstem_leafarea))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm")+
   theme_classic()
+
+summary(lmer(kstem_leafarea ~ cell_viability + (1|tree), data = knative %>% filter(postfire_time!="unburned")))
+
+ggplot(knative %>% filter(postfire_time != "unburned"), aes(x = cell_viability, y = kstem))+
+  geom_point(aes(color = postfire_time))+
+  geom_smooth(method = "glm")+
+  theme_classic()
+
+summary(lmer(kstem ~ cell_viability + (1|tree), data = knative %>% filter(postfire_time!="unburned")))
 
 ggplot(kmax, aes(x = cell_viability, y = kstem))+
   geom_point(aes(color = postfire_time))+
   geom_smooth(method = "glm")+
   theme_classic()
+
+summary(lm(kstem ~ cell_viability, data = kmax))
+
+
+ggplot(kmax, aes(x = cell_viability, y = kstem))+
+  geom_point(aes(color = postfire_time))+
+  geom_smooth(method = "glm")+
+  theme_classic()
+
+summary(lm(kstem~ cell_viability, data = kmax))
+
 
 ggplot(plc, aes(x = cell_viability, y = plc))+
   geom_point(aes(color = postfire_time))+
@@ -289,5 +454,12 @@ ggplot(gmin, aes(x = cell_viability, y = gmin))+
   theme_classic()
 
 summary(lmer(gmin~temperature + (1|tree), data = gmin))
+```
+
+```{r}
+kleaf_total <- inner_join(kleaf_efm, kleaf_vpm, by = c("tree", "branch"))
+
+ggplot(kleaf_total, aes(x = kleaf, kbranch))+
+  geom_point()
 ```
 
