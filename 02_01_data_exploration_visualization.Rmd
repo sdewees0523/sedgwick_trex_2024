@@ -118,16 +118,20 @@ kleaf <- inner_join(hydraulics_efm, gmin, by = c("tree", "branch"))
 cambium_temperature <- rbind(cambium_gmin, cambium_hydraulics) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))
 
-ggplot(cambium_temperature %>% filter(cell_viability <2), aes(x = temperature, y = cell_viability))+
+
+cambium_temperature %>% filter(tree >=100) %>% 
+  reframe(mean = mean(cell_viability))
+
+ggplot(cambium_temperature, aes(x = temperature, y = cell_viability))+
   geom_point()+
   geom_smooth(method = "glm",
               method.args = list(c("Gamma")))+
-  annotate("text", x = 25, y = 2.25, label = "r2 = 0.27")+
-  annotate("text", x = 25, y = 2.1, label = "p = 0.036")+
+  annotate("text", x = 25, y = 2.1, label = "p = 0.013")+
+  geom_hline(yintercept = 1, linetype = "dashed")+
   theme_classic()
 
-summary(lmer(cell_viability~temperature + (1|tree) + (1|branch), data = cambium_temperature %>% filter(cell_viability <2)))
-r.squaredGLMM(lmer(cell_viability~temperature + (1|tree) + (1|branch), data = cambium_temperature %>% filter(cell_viability <2)))
+summary(lmer(cell_viability~temperature + (1|tree), data = cambium_temperature))
+r.squaredGLMM(lmer(cell_viability~temperature + (1|tree), data = cambium_temperature %>% filter(cell_viability <2)))
 ```
 
 

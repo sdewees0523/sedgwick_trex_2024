@@ -18,7 +18,7 @@ Removing weird data values to get r-squared >= 0.92
 gmin_raw <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>% 
   mutate(time = hm(time),
          date = mdy(date)) %>% 
-  filter(date >= mdy("10/30/2024")) %>% 
+  #filter(date >= mdy("10/30/2024")) %>% 
   separate(tree_id, into = c("tree", "branch"), sep = "_") %>% 
   mutate(branch = as.numeric(branch),
          branch = replace_na(branch, 0)) %>% 
@@ -42,6 +42,11 @@ gmin_raw <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>%
                             tree == "2301" & branch == "0" & weight > 1.45 ~ NA,
                             tree == "134" & branch == "0" & weight > 1.25 ~ NA,
                             tree == "126" & branch == "0" & weight > 0.7 ~ NA,
+                            tree == "86" & branch == "0" & weight >2.05 ~ NA,
+                            tree == "74" & branch == "0" & weight > 1.25 ~ NA,
+                            tree == "114" & branch == "3" & weight < 3.3 ~ NA,
+                            tree == "116" & branch == "1" & weight < 2.55 ~ NA,
+                            
                             T ~ weight),
          time = as.numeric(time)) %>%
   drop_na(weight) %>% 
@@ -54,7 +59,7 @@ gmin_raw <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>%
 Visualizing to identify weird data points for above
 
 ```{r}
-ggplot(gmin_raw %>% filter(date == mdy("10/30/2024")), aes(x = time, y = weight))+
+ggplot(gmin_raw %>% filter(date == "2024-12-04"), aes(x = time, y = weight))+
   geom_point()+
   geom_smooth(method = "lm")+
   facet_wrap(~tree*branch*gmin_id, scales = "free")
@@ -63,9 +68,18 @@ ggplot(gmin_raw %>% filter(date == mdy("10/30/2024")), aes(x = time, y = weight)
 Using cleaned data to calculate gmin
 
 ```{r}
+data_logger_0 <- read.csv(here("data", "raw_data", "gmin", "10_11_2024_mm_dd_yyyy", "data_logger_10_11_2024.csv"))
 data_logger_1 <- read.csv(here("data", "raw_data", "gmin", "11_18_2024_mm_dd_yyyy", "data_logger_11_18_2024.csv"))
 data_logger_2 <- read.csv(here("data", "raw_data", "gmin", "11_22_2024_mm_dd_yyyy", "data_logger_11_22_2024.csv"))
 data_logger_3 <- read.csv(here("data", "raw_data", "gmin", "10_30_2024_mm__dd_yyyy", "data_logger_gmin_10_30_2024.csv"))
+data_logger_4 <- read.csv(here("data", "raw_data", "gmin", "12_04_2024_mm_dd_yyyy", "data_logger_12_05_2024.csv"))
+leaf_area_0 <- read.csv(here("data", "raw_data", "gmin", "10_11_2024_mm_dd_yyyy", "leaf_areas.csv"))%>% 
+  mutate(Slice = str_remove(Slice, ".jpg")) %>% 
+  separate(Slice, into = c("tree", "branch"), sep = "_") %>% 
+  mutate(leaf_area = Total.Area/10000,
+         tree = as.numeric(tree),
+         branch = 0) %>% 
+  select(tree, branch, leaf_area)
 leaf_area_1 <- read.csv(here("data", "raw_data", "gmin", "11_18_2024_mm_dd_yyyy", "leaf_areas.csv"))
 leaf_area_2 <- read.csv(here("data", "raw_data", "gmin", "11_22_2024_mm_dd_yyyy", "leaf_areas.csv"))
 leaf_area_3 <- read.csv(here("data", "raw_data", "gmin", "10_30_2024_mm__dd_yyyy", "leaf_areas.csv"))%>% 
@@ -78,6 +92,13 @@ leaf_area_3 <- read.csv(here("data", "raw_data", "gmin", "10_30_2024_mm__dd_yyyy
          tree = as.numeric(tree),
          branch = 0) %>% 
   select(tree, branch, leaf_area)
+leaf_area_4 <- read.csv(here("data", "raw_data", "gmin", "12_04_2024_mm_dd_yyyy", "leaf_areas.csv"))%>% 
+  mutate(Slice = str_remove(Slice, ".jpg")) %>% 
+  separate(Slice, into = c("tree", "branch"), sep = "_") %>% 
+  mutate(leaf_area = Total.Area/10000,
+         tree = as.numeric(tree),
+         branch = as.numeric(branch)) %>% 
+  select(tree, branch, leaf_area)
 
 leaf_area <- rbind(leaf_area_1, leaf_area_2) %>% 
   mutate(Slice = str_remove(Slice, "gmin_"),
@@ -89,9 +110,11 @@ leaf_area <- rbind(leaf_area_1, leaf_area_2) %>%
          tree = as.numeric(tree),
          branch = as.numeric(branch)) %>% 
   select(tree, branch, leaf_area) %>% 
-  rbind(leaf_area_3)
+  rbind(leaf_area_3) %>% 
+  rbind(leaf_area_0) %>% 
+  rbind(leaf_area_4)
 
-enviro <- rbind(data_logger_1, data_logger_2, data_logger_3) %>% 
+enviro <- rbind(data_logger_0, data_logger_1, data_logger_2, data_logger_3, data_logger_4) %>% 
   mutate(time = mdy_hm(time)) %>% 
   separate(time, into = c("date", "time"), sep = " ") %>% 
   mutate(date = ymd(date),
@@ -101,7 +124,6 @@ enviro <- rbind(data_logger_1, data_logger_2, data_logger_3) %>%
 gmin <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>% 
   mutate(time = hm(time),
          date = mdy(date)) %>% 
-  filter(date >= mdy("10/30/2024")) %>% 
   separate(tree_id, into = c("tree", "branch"), sep = "_") %>%
   mutate(branch = as.numeric(branch),
          branch = replace_na(branch, 0)) %>% 
@@ -125,6 +147,10 @@ gmin <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>%
                             tree == "2301" & branch == "0" & weight > 1.45 ~ NA,
                             tree == "134" & branch == "0" & weight > 1.25 ~ NA,
                             tree == "126" & branch == "0" & weight > 0.7 ~ NA,
+                            tree == "86" & branch == "0" & weight >2.05 ~ NA,
+                            tree == "74" & branch == "0" & weight > 1.25 ~ NA,
+                            tree == "114" & branch == "3" & weight < 3.3 ~ NA,
+                            tree == "116" & branch == "1" & weight < 2.55 ~ NA,
                             T ~ weight),
          tree = as.numeric(tree),
          branch = as.numeric(branch)) %>%
