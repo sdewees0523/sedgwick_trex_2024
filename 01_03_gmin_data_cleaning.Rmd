@@ -178,9 +178,10 @@ gmin <- read.csv(here("data", "raw_data", "gmin", "gmin_master.csv")) %>%
          gmin = ((mass_change)/18*1000)/(time_change)/mfvpd/(leaf_area*2)) %>% 
   group_by(tree, branch, gmin_id, date.x) %>% 
   reframe(gmin = mean(gmin)) %>%
-         mutate(treatment = case_when(branch == 0 ~ "preburn",
-                                      tree < 90 ~ "burned",
+         mutate(treatment = case_when(tree < 90 ~ "burned",
                                       tree >= 90 ~ "unburned"),
+                timing = case_when(branch == 0 ~ "preburn",
+                                   branch != 0 ~ "postburn"),
          species = "quag") %>% 
   drop_na()
 
