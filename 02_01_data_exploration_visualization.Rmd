@@ -56,7 +56,7 @@ kleaf_vpm <- read.csv(here("data", "clean_data", "kleaf_vpm_clean.csv")) %>%
 
 knative <- read.csv(here("data", "clean_data", "knative_clean.csv")) %>% 
   inner_join(max_temperature, by = c("tree", "branch"))%>% 
-  left_join(time_hot, by = c("tree", "branch")) %>% 
+  #left_join(time_hot, by = c("tree", "branch")) %>% 
   #inner_join(cambium_hydraulics, by = c("tree", "branch")) %>%
   mutate(minutes = replace_na(minutes, 0)) %>% 
   mutate(postfire_time = case_when(treatment == "unburned" ~ "unburned",
